@@ -31,6 +31,18 @@ def zeropower_via_newtonschulz5(G, steps: int):
     return X
 
 
+def NS_complexity(p: torch.Tensor) -> int:
+  """
+  Compute complexity of Netwon-Schulz on p.grad.
+  X @ X.T complexity: m^2n
+  XX.T @ XX.T complexity: m^3
+  XX.TXX.T @ X complexity: m^2n
+  m, n is the shape after potentially flatting trailing dims.
+  """
+  m, n = (p.shape[0], torch.tensor(p.shape[1:]).prod().item())
+  return 2 * (m ** 2) * n + m ** 3
+
+
 def muon_update(grad, momentum, beta=0.95, ns_steps=5, nesterov=True):
     momentum.lerp_(grad, 1 - beta)
     update = grad.lerp_(momentum, beta) if nesterov else momentum
@@ -65,7 +77,7 @@ class Muon(torch.optim.Optimizer):
     def __init__(self, params, lr=0.02, weight_decay=0, momentum=0.95):
         defaults = dict(lr=lr, weight_decay=weight_decay, momentum=momentum)
         assert isinstance(params, list) and len(params) >= 1 and isinstance(params[0], torch.nn.Parameter)
-        params = sorted(params, key=lambda x: x.size(), reverse=True)
+        params = sorted(params, key=NS_complexity, reverse=True)
         super().__init__(params, defaults)
 
     @torch.no_grad()
